@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "LLVM-mingw",
+            "compilerPath": "C:\\Users\\AymanCassim\\llvm-mingw\\llvm-mingw-20260616-msvcrt-x86_64\\bin\\clang++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/imgui",
+                "${workspaceFolder}/imgui/backends"
+            ],
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+        }
+    ],
+    "version": 4
+}
