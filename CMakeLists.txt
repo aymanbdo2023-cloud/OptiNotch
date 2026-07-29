@@ -21,6 +21,8 @@ set(IMGUI_SOURCES
 
 add_executable(${PROJECT_NAME}
     src/main.cpp
+    src/window/window.cpp
+    src/ui/main_ui.cpp
     ${IMGUI_SOURCES}
 )
 
@@ -34,6 +36,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE d3d11 dwmapi d3dcompiler)
 
 add_library(${PROJECT_NAME}_shared SHARED
     src/main.cpp
+    src/window/window.cpp
+    src/ui/main_ui.cpp
     ${IMGUI_SOURCES}
 )
 

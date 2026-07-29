@@ -3,9 +3,13 @@ import sys
 from pathlib import Path
 import ctypes
 import os
+import time
 
 BUILD_DIR = Path("build")
 DLL_PATH = BUILD_DIR / "libOptiNotch_shared.dll"
+
+mtime = 0
+
 
 def build():
     if not (BUILD_DIR / "CMakeCache.txt").exists():
@@ -23,6 +27,7 @@ def run():
     dll = ctypes.CDLL(str(DLL_PATH))
     dll.run.restype = ctypes.c_int
     ret = dll.run()
+    print(f"run() returned: {ret}")
     sys.exit(ret)
 
 if __name__ == "__main__":

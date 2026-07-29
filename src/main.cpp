@@ -1,4 +1,7 @@
 #define WIN32_LEAN_AND_MEAN
+#include "window/window.h"
+#include "ui/main_ui.h"
+
 #include <windows.h>
 #include <d3d11.h>
 #include <imgui.h>
@@ -11,25 +14,17 @@
 #define OPTINOTCH_API
 #endif
 
-static HWND g_hwnd = nullptr;
-static ID3D11Device *g_device = nullptr;
-static ID3D11DeviceContext *g_context = nullptr;
-static IDXGISwapChain *g_swap_chain = nullptr;
-static ID3D11RenderTargetView *g_target_view = nullptr;
+ID3D11Device *g_device = nullptr;
+ID3D11DeviceContext *g_context = nullptr;
+IDXGISwapChain *g_swap_chain = nullptr;
+ID3D11RenderTargetView *g_target_view = nullptr;
+
+ImFont* g_font_small = nullptr;
+ImFont* g_font_normal = nullptr;
+ImFont* g_font_clock = nullptr;
+ImFont* g_font_collapsed = nullptr;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
-
-static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
-        return true;
-
-    switch (msg) {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-    }
-    return DefWindowProcW(hwnd, msg, wparam, lparam);
-}
 
 static bool create_d3d11(HWND hwnd) {
     DXGI_SWAP_CHAIN_DESC desc{};
@@ -69,59 +64,48 @@ static void cleanup_d3d11() {
 }
 
 extern "C" OPTINOTCH_API int run() {
-    WNDCLASSEXW wc{};
-    wc.cbSize        = sizeof(wc);
-    wc.style         = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc   = wnd_proc;
-    wc.hInstance     = GetModuleHandleW(nullptr);
-    wc.lpszClassName = L"OptiNotchClass";
-
-    RegisterClassExW(&wc);
-
-    g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"OptiNotch",
-                             WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                             1280, 720, nullptr, nullptr, wc.hInstance, nullptr);
-
-    if (!g_hwnd)
+    if (!create_window(GetModuleHandleW(nullptr), 100, 15))
         return 1;
 
-    if (!create_d3d11(g_hwnd)) {
-        DestroyWindow(g_hwnd);
+    if (!create_d3d11(get_window_handle()))
         return 1;
-    }
 
-    ShowWindow(g_hwnd, SW_SHOWDEFAULT);
+    if (!g_device || !g_context || !g_swap_chain || !g_target_view)
+        return 2;
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
-    ImGui_ImplWin32_Init(g_hwnd);
+    ImGuiIO& io = ImGui::GetIO();
+    g_font_small     = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-Regular.ttf", 11.0f);
+    g_font_normal    = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-Regular.ttf", 14.0f);
+    g_font_clock     = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-SemiBold.ttf", 32.0f);
+    g_font_collapsed = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-SemiBold.ttf", 14.0f);
+    io.FontDefault = g_font_normal;
+
+    ImGui_ImplWin32_Init(get_window_handle());
     ImGui_ImplDX11_Init(g_device, g_context);
 
-    bool running = true;
-    while (running) {
-        MSG msg;
-        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            if (msg.message == WM_QUIT)
-                running = false;
+    MSG msg = {};
+    while (msg.message != WM_QUIT) {
+        if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
 
-        if (!running)
-            break;
+        update_window_animation();
 
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
+
+        int w = get_window_width();
+        int h = get_window_height();
         ImGui::NewFrame();
-
-        // Where the code for my UI should be
-        ImGui::ShowDemoWindow(nullptr);
-
+        render_ui(g_progress > 0.5f, w, h);
         ImGui::Render();
 
-        const float clear_color[] = { 0.1f, 0.1f, 0.1f, 1.0f };
+        const float clear_color[] = { 0.0f, 0.0f, 0.0f, 0.0f };
         g_context->OMSetRenderTargets(1, &g_target_view, nullptr);
         g_context->ClearRenderTargetView(g_target_view, clear_color);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -132,7 +116,7 @@ extern "C" OPTINOTCH_API int run() {
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
     cleanup_d3d11();
-    DestroyWindow(g_hwnd);
+    destroy_window();
 
     return 0;
 }
