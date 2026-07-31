@@ -32,7 +32,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${IMGUI_DIR}/backends
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE d3d11 dwmapi d3dcompiler)
+target_link_libraries(${PROJECT_NAME} PRIVATE d3d11 dxgi dwmapi d3dcompiler dcomp)
 
 add_library(${PROJECT_NAME}_shared SHARED
     src/main.cpp
@@ -51,7 +51,7 @@ target_include_directories(${PROJECT_NAME}_shared PRIVATE
     ${IMGUI_DIR}/backends
 )
 
-target_link_libraries(${PROJECT_NAME}_shared PRIVATE d3d11 dwmapi d3dcompiler)
+target_link_libraries(${PROJECT_NAME}_shared PRIVATE d3d11 dxgi dwmapi d3dcompiler dcomp)
 
 target_link_options(${PROJECT_NAME}_shared PRIVATE
     -static-libstdc++ -static-libgcc -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic

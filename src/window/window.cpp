@@ -1,19 +1,15 @@
 #include "window.h"
 #include <imgui_impl_win32.h>
+#include <dwmapi.h>
 #include <iostream>
 
-
-const int NOTCH_WIDTH = 120;
-const int NOTCH_HEIGHT = 20;
-const int EXPANDED_WIDTH = 600; 
-const int EXPANDED_HEIGHT = 150; 
-static bool expanded = false;
-
+const float DEFAULT_OPACITY = 240.0f;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
 static HWND g_hwnd = nullptr;
 float g_progress = 0.0f;
+float g_window_alpha = DEFAULT_OPACITY / 255.0f;
 
 int get_window_width() {
     RECT r;
@@ -23,6 +19,21 @@ int get_window_width() {
 int get_window_height() {
     RECT r;
     return GetWindowRect(g_hwnd, &r) ? (r.bottom - r.top) : 0;
+}
+
+// True when screen point (sx, sy) is inside the animated island rect. The
+// window is fixed at the expanded size, so this is the centered, interpolated
+// island, not the whole window.
+static bool point_over_island(int sx, int sy) {
+    RECT rc;
+    if (!GetWindowRect(g_hwnd, &rc))
+        return false;
+    int w = rc.right - rc.left;
+    float iw = NOTCH_WIDTH + (EXPANDED_WIDTH - NOTCH_WIDTH) * g_progress;
+    float ih = NOTCH_HEIGHT + (EXPANDED_HEIGHT - NOTCH_HEIGHT) * g_progress;
+    float ix = ((float)w - iw) * 0.5f;
+    return sx >= rc.left + ix && sx <= rc.left + ix + iw &&
+           sy >= rc.top && sy <= rc.top + ih;
 }
 
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -51,8 +62,8 @@ bool create_window(HINSTANCE instance, int width, int height) {
     RegisterClassExW(&wc);
 
     g_hwnd = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED, 
-        L"OptiNotchClass", L"OptiNotch", 
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+        L"OptiNotchClass", L"OptiNotch",
         WS_POPUP,
         0, 0, width, height,
         nullptr, nullptr, instance, nullptr
@@ -61,14 +72,23 @@ bool create_window(HINSTANCE instance, int width, int height) {
     if (!g_hwnd)
         return false;
 
-    HRGN region = CreateRoundRectRgn(0, 0, width, height, 2, 4);
-    SetWindowRgn(g_hwnd, region, TRUE);
+    // Remove the 1px DWM frame so the DComp client area is flush with the
+    // window's top edge (otherwise the notch sits 1px below the screen top).
+    MARGINS margins = { -1, -1, -1, -1 };
+    DwmExtendFrameIntoClientArea(g_hwnd, &margins);
 
-    SetLayeredWindowAttributes(g_hwnd, 0, 220, LWA_ALPHA);
+    // Color-keyed layered window: pixels matching the key (black, the
+    // transparent background of the swapchain) become click-through for the
+    // apps underneath. HTTRANSPARENT can't pass clicks across processes, but
+    // the layered-window color key is handled by DWM itself. Black also has
+    // R == B, which avoids the known Aero color-key hit-test bug. The island
+    // fill is dark gray, so it stays opaque and keeps receiving mouse input.
+    SetLayeredWindowAttributes(g_hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+
     RECT desktop;
     GetClientRect(GetDesktopWindow(), &desktop);
     int x = (desktop.right - width) / 2;
-    SetWindowPos(g_hwnd, HWND_TOPMOST, x, 3, width, height, SWP_SHOWWINDOW);
+    SetWindowPos(g_hwnd, HWND_TOPMOST, x, 0, width, height, SWP_SHOWWINDOW);
 
     return true;
 }
@@ -90,88 +110,25 @@ void update_window_animation() {
 
     POINT cursor;
     GetCursorPos(&cursor);
-    RECT rect;
-    GetWindowRect(g_hwnd, &rect);
 
+    // Hover only the visible island, not the surrounding transparent window.
     bool ctrl_pressed = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
-    bool hovered = (cursor.x >= rect.left && cursor.x <= rect.right &&
-                    cursor.y >= 0 && cursor.y <= rect.bottom);
+    bool hovered = point_over_island(cursor.x, cursor.y);
 
-
-    // Defining the behaviour of the window based on different events 
-    // When hovered + ctrl pressed
+    // Hovered + Ctrl held -> more transparent
     if (hovered && ctrl_pressed) {
-        // The 180 is the traslucence value (255 is fully opaque)
-        SetLayeredWindowAttributes(g_hwnd, 0, 180, LWA_ALPHA); 
+        g_window_alpha = 180.0f / 255.0f;
+    } else {
+        g_window_alpha = DEFAULT_OPACITY / 255.0f;
     }
 
-    // When not hovered + ctrl not pressed
-    if (!hovered && !ctrl_pressed) {
-        SetLayeredWindowAttributes(g_hwnd, 0, 220, LWA_ALPHA); 
-    }
-
-    // When not hovered + ctrl pressed
-    if (!hovered && ctrl_pressed) {
-        SetLayeredWindowAttributes(g_hwnd, 0, 220, LWA_ALPHA); 
-    }
-    
-    // When hovered + ctrl not pressed
+    // Hovered (no Ctrl) -> expand, otherwise shrink
     if (hovered && !ctrl_pressed) {
-        SetLayeredWindowAttributes(g_hwnd, 0, 220, LWA_ALPHA); 
-        g_progress += 0.04f;
-        expanded = true;
-    }
-    else {
-        g_progress -= 0.05f;
-        expanded = false;
+        g_progress += 0.12f;
+    } else {
+        g_progress -= 0.12f;
     }
 
     if (g_progress < 0.0f) g_progress = 0.0f;
     if (g_progress > 1.0f) g_progress = 1.0f;
-    
-
-    int w = NOTCH_WIDTH + (int)((EXPANDED_WIDTH - NOTCH_WIDTH) * g_progress);
-    int h = NOTCH_HEIGHT + (int)((EXPANDED_HEIGHT - NOTCH_HEIGHT) * g_progress);
-
-    static int last_w = 0, last_h = 0;
-    if (w == last_w && h == last_h)
-        return;
-    last_w = w; last_h = h;
-
-    RECT desktop;
-    GetClientRect(GetDesktopWindow(), &desktop);
-    int x = (desktop.right - w) / 2;
-
-    // Made is so that when the window is expanded there is no padding at the top of the screen
-    if (expanded) {
-        SetWindowPos(g_hwnd, HWND_TOPMOST, x, 0, w, h, SWP_SHOWWINDOW);
-    } else {
-        SetWindowPos(g_hwnd, HWND_TOPMOST, x, 3, w, h, SWP_SHOWWINDOW);
-    }
-
-    HRGN region = CreateRoundRectRgn(0, 0, w, h, 5, 5);
-    SetWindowRgn(g_hwnd, region, TRUE);
-
-    if (g_context && g_swap_chain && g_device) {
-        g_context->OMSetRenderTargets(0, nullptr, nullptr);
-        if (g_target_view) {
-            g_target_view->Release();
-            g_target_view = nullptr;
-        }
-        g_context->Flush();
-
-        g_swap_chain->ResizeBuffers(0, w, h, DXGI_FORMAT_UNKNOWN, 0);
-
-        ID3D11Texture2D *back_buffer = nullptr;
-        if (SUCCEEDED(g_swap_chain->GetBuffer(0, IID_PPV_ARGS(&back_buffer)))) {
-            g_device->CreateRenderTargetView(back_buffer, nullptr, &g_target_view);
-            back_buffer->Release();
-        }
-
-        D3D11_VIEWPORT vp{};
-        vp.Width = (FLOAT)w;
-        vp.Height = (FLOAT)h;
-        vp.MaxDepth = 1.0f;
-        g_context->RSSetViewports(1, &vp);
-    }
 }
