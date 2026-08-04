@@ -25,3 +25,11 @@ void update_window_animation();
 
 int get_window_width();
 int get_window_height();
+
+// DPI scale (physical px per logical px) for the chosen monitor, fixed at startup.
+float get_ui_scale();
+// Recompute the window's top-center position from the current settings.
+void window_apply_position();
+// Tray/hotkey hide override: keeps the notch animated away until cleared.
+void window_set_hidden(bool hidden);
+bool window_is_hidden();

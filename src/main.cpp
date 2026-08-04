@@ -1,6 +1,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include "window/window.h"
 #include "ui/main_ui.h"
+#include "media/media.h"
+#include "calendar/calendar.h"
+#include "settings/settings.h"
+#include "tray/tray.h"
 
 #include <windows.h>
 #include <d3d11.h>
@@ -29,6 +33,7 @@ ImFont* g_font_small = nullptr;
 ImFont* g_font_normal = nullptr;
 ImFont* g_font_clock = nullptr;
 ImFont* g_font_collapsed = nullptr;
+ImFont* g_font_icons = nullptr;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
@@ -95,8 +100,9 @@ static bool create_d3d11(HWND hwnd) {
 
     DXGI_SWAP_CHAIN_DESC1 desc{};
     desc.BufferCount = 2;
-    desc.Width = EXPANDED_WIDTH;
-    desc.Height = EXPANDED_HEIGHT;
+    float s = get_ui_scale();
+    desc.Width = (UINT)(EXPANDED_WIDTH * s + 0.5f);
+    desc.Height = (UINT)(EXPANDED_HEIGHT * s + 0.5f);
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.SampleDesc.Count = 1;
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -154,6 +160,13 @@ static void cleanup_d3d11() {
 }
 
 extern "C" OPTINOTCH_API int run() {
+    // Per-monitor DPI so the notch stays crisp and consistently sized; must be
+    // called before any window is created.
+    ImGui_ImplWin32_EnableDpiAwareness();
+
+    settings_load();
+    settings_apply_autostart(); // keep the Run key in sync with the setting
+
     if (!create_window(GetModuleHandleW(nullptr), EXPANDED_WIDTH, EXPANDED_HEIGHT))
         return 1;
 
@@ -167,15 +180,32 @@ extern "C" OPTINOTCH_API int run() {
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
+    // The UI is laid out in logical px and scaled up via
+    // io.DisplayFramebufferScale. Fonts are rasterized at the scaled size so
+    // text stays crisp; FontGlobalScale brings the reported size back to
+    // logical px for layout math.
+    const float scale = get_ui_scale();
     ImGuiIO& io = ImGui::GetIO();
-    g_font_small     = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-Regular.ttf", 11.0f);
-    g_font_normal    = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-Regular.ttf", 14.0f);
-    g_font_clock     = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-SemiBold.ttf", 32.0f);
-    g_font_collapsed = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-SemiBold.ttf", 14.0f);
+    g_font_small     = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-Regular.ttf", 11.0f * scale);
+    g_font_normal    = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-Regular.ttf", 14.0f * scale);
+    g_font_clock     = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-SemiBold.ttf", 32.0f * scale);
+    g_font_collapsed = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-SemiBold.ttf", 14.0f * scale);
+    {
+        static const ImWchar icon_ranges[] = { 0xE000, 0xF8FF, 0, 0 };
+        g_font_icons = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/SegMDL2.ttf", 16.0f * scale, nullptr, icon_ranges);
+    }
     io.FontDefault = g_font_normal;
+    io.FontGlobalScale = 1.0f / scale;
 
     ImGui_ImplWin32_Init(get_window_handle());
     ImGui_ImplDX11_Init(g_device, g_context);
+
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    tray_init(get_window_handle());
+
+    AppSettings st = settings_get();
+    if (st.media_enabled) media_init();
+    if (st.calendar_enabled) cal_init();
 
     MSG msg = {};
     while (msg.message != WM_QUIT) {
@@ -185,14 +215,25 @@ extern "C" OPTINOTCH_API int run() {
         }
 
         update_window_animation();
+        media_update();
 
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
 
-        int w = get_window_width();
-        int h = get_window_height();
+        // Override the backend's physical window size with our logical canvas;
+        // the framebuffer scale maps it to the (larger) swapchain.
+        io.DisplaySize = ImVec2((float)EXPANDED_WIDTH, (float)EXPANDED_HEIGHT);
+        io.DisplayFramebufferScale = ImVec2(scale, scale);
+
         ImGui::NewFrame();
-        render_ui(g_progress > 0.5f, w, h);
+
+        // The Win32 backend reports the mouse in physical px; map to logical.
+        io.MousePos.x /= scale;
+        io.MousePos.y /= scale;
+        io.MousePosPrev.x /= scale;
+        io.MousePosPrev.y /= scale;
+
+        render_ui(g_progress > 0.5f, EXPANDED_WIDTH, EXPANDED_HEIGHT);
         ImGui::Render();
 
         const float clear_color[] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -207,6 +248,11 @@ extern "C" OPTINOTCH_API int run() {
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+    tray_shutdown();
+    media_shutdown();
+    cal_shutdown();
+    ui_cleanup();
+    CoUninitialize();
     cleanup_d3d11();
     destroy_window();
 

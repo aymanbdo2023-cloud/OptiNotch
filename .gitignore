@@ -70,3 +70,14 @@ imgui/
 # test output & cache
 Testing/
 .cache/
+
+# Google OAuth credentials & tokens (never commit these)
+gcal_credentials.json
+gcal_token.json
+
+# Release packages
+dist/
+
+# Stray debug output
+err.txt
+out.txt
