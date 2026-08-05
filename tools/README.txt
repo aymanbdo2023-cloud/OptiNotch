@@ -10,8 +10,7 @@ Double-click OptiNotch.exe. Nothing else needs installing. The app is
 single-instance-ish: it keeps running from the tray icon; use the tray menu to
 hide/show it, open settings, toggle Start-with-Windows, or quit.
 
-Hover the notch to expand it. Hold Ctrl while hovering to make it more
-transparent. Win+Alt slides the notch away (toggle the hotkey in settings).
+Hover the notch to expand it. Win+Alt slides the notch away (toggle the hotkey in settings).
 
 Google Calendar (optional)
 -------------------------

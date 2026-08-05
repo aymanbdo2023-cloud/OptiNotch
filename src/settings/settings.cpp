@@ -66,7 +66,6 @@ void settings_load() {
         s.accent_g = (int)j.get_num("accent_g", 147);
         s.accent_b = (int)j.get_num("accent_b", 255);
         s.opacity_normal = (float)j.get_num("opacity_normal", 240.0);
-        s.opacity_hover = (float)j.get_num("opacity_hover", 180.0);
         s.media_enabled = j.get_bool("media_enabled", true);
         s.calendar_enabled = j.get_bool("calendar_enabled", true);
     }
@@ -75,7 +74,6 @@ void settings_load() {
     s.accent_g = s.accent_g < 0 ? 0 : (s.accent_g > 255 ? 255 : s.accent_g);
     s.accent_b = s.accent_b < 0 ? 0 : (s.accent_b > 255 ? 255 : s.accent_b);
     if (s.opacity_normal < 0.0f) s.opacity_normal = 240.0f;
-    if (s.opacity_hover < 0.0f) s.opacity_hover = 180.0f;
 
     g_settings = s;
 }
@@ -93,7 +91,6 @@ void settings_save() {
     f << "  \"accent_g\": " << s.accent_g << ",\n";
     f << "  \"accent_b\": " << s.accent_b << ",\n";
     f << "  \"opacity_normal\": " << s.opacity_normal << ",\n";
-    f << "  \"opacity_hover\": " << s.opacity_hover << ",\n";
     f << "  \"media_enabled\": " << (s.media_enabled ? "true" : "false") << ",\n";
     f << "  \"calendar_enabled\": " << (s.calendar_enabled ? "true" : "false") << "\n";
     f << "}\n";

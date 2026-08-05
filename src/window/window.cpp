@@ -275,18 +275,12 @@ void update_window_animation() {
     // Hover only the visible island, not the surrounding transparent window.
     // The settings panel also holds the notch open so it stays usable even
     // when the mouse leaves the island.
-    bool ctrl_pressed = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
     bool hovered = point_over_island(cursor.x, cursor.y) || settings_active;
 
-    // Hovered + Ctrl held -> more transparent
-    if (hovered && ctrl_pressed) {
-        g_window_alpha = s.opacity_hover / 255.0f;
-    } else {
-        g_window_alpha = s.opacity_normal / 255.0f;
-    }
+    g_window_alpha = s.opacity_normal / 255.0f;
 
-    // Hovered (no Ctrl) -> expand, otherwise shrink. Settings keeps it open.
-    if ((hovered && !ctrl_pressed) || (settings_active && !want_hidden)) {
+    // Hovered -> expand, otherwise shrink. Settings keeps it open.
+    if (hovered || (settings_active && !want_hidden)) {
         g_progress += 0.12f;
     } else {
         g_progress -= 0.12f;

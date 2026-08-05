@@ -10,8 +10,7 @@ struct AppSettings {
     bool hide_hotkey = true;     // Win+Alt slides the notch away / back
     bool start_with_windows = false;
     int accent_r = 92, accent_g = 147, accent_b = 255;  // 0..255 accent used across the UI
-    float opacity_normal = 240.0f;  // notch fill alpha (0..255) at rest
-    float opacity_hover = 180.0f;   // fill alpha when hovered while holding Ctrl
+    float opacity_normal = 240.0f;  // notch fill alpha (0..255)
     bool media_enabled = true;      // start the media (SMTC) session poller
     bool calendar_enabled = true;   // start the Google Calendar poller
 };

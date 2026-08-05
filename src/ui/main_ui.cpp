@@ -53,7 +53,7 @@ static const float FONT_NORMAL_SIZE = 14.0f;
 static const float FONT_CLOCK_SIZE = 32.0f;
 
 // Accent color from settings.json, as an ImGui-packed color.
-static ImU32 accent_u32() {
+ImU32 accent_u32() {
     AppSettings s = settings_get();
     return IM_COL32(s.accent_r, s.accent_g, s.accent_b, 255);
 }
@@ -344,12 +344,9 @@ static void render_left_half(ImDrawList* dl, float W, float H) {
     if (cal.year == 0) { cal.year = st.wYear; cal.month = st.wMonth - 1; }
     bool is_cur = (cal.year == st.wYear && cal.month == st.wMonth - 1);
 
-    char tbuf[8];
-    sprintf(tbuf, "%02d:%02d", st.wHour, st.wMinute);
-    ImVec2 tts = g_font_collapsed->CalcTextSizeA(15.0f, FLT_MAX, -1.0f, tbuf);
+    // Month header (the wall clock lives in the expanded notch's header bar,
+    // so there is no separate time display in the calendar half).
     float hy = o.y + 15.0f;
-    dl->AddText(g_font_collapsed, 15.0f, ImVec2(x0, hy - tts.y * 0.5f),
-        IM_COL32(214, 216, 224, 255), tbuf);
 
     if (g_font_icons) {
         ImU32 rcol = cal.busy ? C_ACCENT : 0;
@@ -359,7 +356,7 @@ static void render_left_half(ImDrawList* dl, float W, float H) {
 
     char hbuf[64];
     sprintf(hbuf, "%s %d", months[cal.month], cal.year);
-    float head_mid = (x0 + tts.x + x1 - 22.0f) * 0.5f;
+    float head_mid = (x0 + x1 - 22.0f) * 0.5f;
     ImVec2 hts = g_font_collapsed->CalcTextSizeA(14.0f, FLT_MAX, -1.0f, hbuf);
     ImVec2 hr0(head_mid - hts.x * 0.5f - 8.0f, hy - 10.0f), hr1(head_mid + hts.x * 0.5f + 8.0f, hy + 10.0f);
     ImGui::SetCursorScreenPos(hr0);
@@ -564,8 +561,8 @@ static void render_right_half(ImDrawList* dl, float W, float H) {
     float tcol_w = o.x + W - M - tx;
 
     // Compact vertical stack (title / artist / status / controls / progress),
-    // centered with symmetric top and bottom margins.
-    float cy0 = o.y + (H - 102.0f) * 0.5f;
+    // biased slightly upward so it sits closer to the header bar.
+    float cy0 = o.y + (H - 102.0f) * 0.5f - 8.0f;
 
     draw_marquee_text(dl, g_font_collapsed, 14.0f, ImVec2(tx, cy0), tcol_w,
         IM_COL32(245, 245, 248, 255), w2u(g_media.title));
@@ -745,50 +742,61 @@ void render_ui(bool expanded, int width, int height) {
     float rbl = fminf(RAD_BL, ih * 0.25f);
     draw_island_shape(dl, ix, iy, iw, ih, RAD_TL, RAD_TR, rbr, rbl, g_window_alpha);
 
-    if (expanded) {
-        float mx = ix + iw * 0.45f;
-        dl->AddRectFilled(ImVec2(mx - 1.0f, iy + 24.0f), ImVec2(mx + 1.0f, iy + ih - 24.0f),
-            IM_COL32(255, 255, 255, 40));
-    }
-
     push_style();
 
     if (expanded) {
-        ImGui::SetCursorPos(ImVec2(ix, iy));
-        ImGui::BeginChild("island_content", ImVec2(iw, ih), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollWithMouse);
-
-        if (ui_settings_open()) {
-            render_settings_panel(iw, ih);
-        } else {
-            float left_w = iw * 0.45f;
-            float right_w = iw - left_w;
-
-            ImGui::BeginChild("left", ImVec2(left_w, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollWithMouse);
-            render_left_half(ImGui::GetWindowDrawList(), left_w, ih);
-            ImGui::EndChild();
-            ImGui::SameLine();
-
-            ImGui::BeginChild("right", ImVec2(right_w, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollWithMouse);
-            render_right_half(ImGui::GetWindowDrawList(), right_w, ih);
-            ImGui::EndChild();
-        }
+        // Header bar: clock (left) + settings gear (right), with margins. The
+        // calendar/media/settings content lives in its own child below it, so
+        // the expanded island reads as a header bar over a content section.
+        const float HEADER_H = 24.0f;
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        char tbuf[8];
+        sprintf(tbuf, "%02d:%02d", st.wHour, st.wMinute);
+        ImVec2 hts = g_font_collapsed->CalcTextSizeA(15.0f, FLT_MAX, -1.0f, tbuf);
+        dl->AddText(g_font_collapsed, 15.0f, ImVec2(ix + 18.0f, iy + HEADER_H * 0.5f - hts.y * 0.5f),
+            IM_COL32(235, 236, 240, 255), tbuf);
 
         // Gear: opens/closes the settings panel. It lives in its own child
-        // window created after the calendar/media halves so it is the top-most
-        // hover target; a button added to the parent window would be shadowed
-        // by the right-half child and never receive clicks.
+        // window so it is the top-most hover target in the header; it must not
+        // be shadowed by the content child below it.
         if (g_font_icons) {
             const float gh = 12.0f;
-            ImGui::SetCursorScreenPos(ImVec2(ix + iw - 22.0f - gh, iy + 12.0f - gh));
+            ImGui::SetCursorScreenPos(ImVec2(ix + iw - 22.0f - gh, iy + HEADER_H * 0.5f - gh));
             ImGui::BeginChild("##gear_hit", ImVec2(gh * 2.0f, gh * 2.0f), ImGuiChildFlags_None,
                 ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground);
-            if (draw_icon_button(ImGui::GetWindowDrawList(), ImVec2(ix + iw - 22.0f, iy + 12.0f),
+            if (draw_icon_button(ImGui::GetWindowDrawList(), ImVec2(ix + iw - 22.0f, iy + HEADER_H * 0.5f),
                     11.0f, "\xEE\x9C\x93", "##gear")) {
                 if (ui_settings_open())
                     ui_close_settings_panel();
                 else
                     ui_open_settings_panel();
             }
+            ImGui::EndChild();
+        }
+
+        ImGui::SetCursorPos(ImVec2(ix, iy + HEADER_H));
+        ImGui::BeginChild("island_content", ImVec2(iw, ih - HEADER_H), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollWithMouse);
+
+        if (ui_settings_open()) {
+            render_settings_panel(iw, ih - HEADER_H);
+        } else {
+            float left_w = iw * 0.45f;
+            float right_w = iw - left_w;
+
+            // Vertical divider between the calendar and media halves. Only drawn
+            // when the halves are visible, not over the settings panel.
+            float dmx = ix + iw * 0.45f;
+            dl->AddRectFilled(ImVec2(dmx - 1.0f, iy + HEADER_H + 12.0f), ImVec2(dmx + 1.0f, iy + ih - 12.0f),
+                IM_COL32(255, 255, 255, 40));
+
+            ImGui::BeginChild("left", ImVec2(left_w, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollWithMouse);
+            render_left_half(ImGui::GetWindowDrawList(), left_w, ih - HEADER_H);
+            ImGui::EndChild();
+            ImGui::SameLine();
+
+            ImGui::BeginChild("right", ImVec2(right_w, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollWithMouse);
+            render_right_half(ImGui::GetWindowDrawList(), right_w, ih - HEADER_H);
             ImGui::EndChild();
         }
 

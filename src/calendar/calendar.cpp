@@ -397,7 +397,35 @@ DWORD WINAPI cal_thread_main(void*) {
     int cur_y = -1, cur_m = -1;
     double last_fetch = 0.0;
 
+    // Last wall-clock month/year seen by the loop. Used to roll the displayed
+    // month over when the date changes (midnight, sleep/resume) while the user
+    // is viewing "today".
+    SYSTEMTIME st0;
+    GetLocalTime(&st0);
+    int known_y = st0.wYear, known_m = st0.wMonth - 1;
+
     while (!g_cal_stop) {
+        // Keep "today" (and the displayed month when it is the current one) in
+        // sync with the wall clock. The date is only computed once at init, so
+        // it would otherwise go stale after the machine sleeps or a day/month
+        // boundary rolls past.
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        {
+            std::lock_guard<std::mutex> lk(g_cal_mutex);
+            g_cal.today_day = st.wDay;
+            bool viewing_known = (g_cal.year == known_y && g_cal.month == known_m);
+            bool month_changed = (st.wYear != known_y || (st.wMonth - 1) != known_m);
+            if (month_changed && viewing_known) {
+                g_cal.year = st.wYear;
+                g_cal.month = st.wMonth - 1;
+                g_cal.selected_day = 0;
+                g_cal.refresh_requested = true;
+            }
+        }
+        known_y = st.wYear;
+        known_m = st.wMonth - 1;
+
         bool refresh = false, pending = false, signout = false;
         int year, month;
         {

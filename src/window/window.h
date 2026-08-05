@@ -16,7 +16,7 @@ extern float g_window_alpha;
 constexpr int NOTCH_WIDTH = 120;
 constexpr int NOTCH_HEIGHT = 20;
 constexpr int EXPANDED_WIDTH = 600;
-constexpr int EXPANDED_HEIGHT = 150;
+constexpr int EXPANDED_HEIGHT = 190;
 
 bool create_window(HINSTANCE instance, int width, int height);
 HWND get_window_handle();

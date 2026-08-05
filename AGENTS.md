@@ -144,12 +144,13 @@ Gotchas in this ImGui build:
 
 ## Window behavior (src/window/window.cpp)
 
-- Constants: `NOTCH_WIDTH=120`, `NOTCH_HEIGHT=20`, `EXPANDED_WIDTH=600`, `EXPANDED_HEIGHT=150`. These are **logical px**; the physical window/swapchain are scaled by `g_ui_scale` (DPI of the chosen monitor, fixed at startup, ≥1).
+- Constants: `NOTCH_WIDTH=120`, `NOTCH_HEIGHT=20`, `EXPANDED_WIDTH=600`, `EXPANDED_HEIGHT=190`. These are **logical px**; the physical window/swapchain are scaled by `g_ui_scale` (DPI of the chosen monitor, fixed at startup, ≥1).
 - Window is **fixed** at `EXPANDED_WIDTH x EXPANDED_HEIGHT` (scaled), top-center of the configured monitor's **work area**, flush with its top. Created and swapped at the expanded size; **no per-frame `SetWindowPos`/`ResizeBuffers`** — the swapchain/RTV are created once in `create_d3d11()`.
-- The island grows/shrinks symmetrically inside the fixed window: `render_ui()` computes `iw`/`ih` from `g_progress` (`120→600` x `20→150`) and offsets `ix = (width-iw)/2`, so both edges expand from center. `update_window_animation()` only updates `g_progress` and `g_window_alpha`.
-- Hover expands: `g_progress += 0.12f` per frame when hovered (no Ctrl), `-= 0.12f` otherwise (clamped 0..1). `point_over_island()`/`update_window_region()` use `island_window_rect()` in **physical** px (logical constants × `g_ui_scale`). While the settings panel is open (`ui_settings_open()`), the notch is treated as hovered AND hide-override is cancelled, so opening Settings from the tray always reveals the expanded notch.
+- The island grows/shrinks symmetrically inside the fixed window: `render_ui()` computes `iw`/`ih` from `g_progress` (`120→600` x `20→190`) and offsets `ix = (width-iw)/2`, so both edges expand from center. `update_window_animation()` only updates `g_progress` and `g_window_alpha`.
+- **Expanded layout = header bar + content section.** `render_ui()` reserves a 24px header (`HEADER_H`) at the top of the expanded island: the clock (left, `ix+18`) and the settings gear (right, `ix+iw-22`, own `##gear_hit` child so it stays top-most) vertically centered. The `island_content` child starts at `iy + HEADER_H` with height `ih - HEADER_H`, so the calendar/media/settings halves keep their exact internal layout at the same ~166px content height — they are just shifted down. The calendar/media vertical divider spans `iy + HEADER_H + 12` → `iy + ih - 12`. The calendar half's own top-row clock was removed when the header clock arrived; the media half's vertical stack is biased ~8px upward (`cy0 = o.y + (H-102)*0.5 - 8`).
+- Hover expands: `g_progress += 0.12f` per frame when hovered, `-= 0.12f` otherwise (clamped 0..1). `point_over_island()`/`update_window_region()` use `island_window_rect()` in **physical** px (logical constants × `g_ui_scale`). While the settings panel is open (`ui_settings_open()`), the notch is treated as hovered AND hide-override is cancelled, so opening Settings from the tray always reveals the expanded notch.
 - **Hide**: animated via `g_hide` 0→1. Want-hidden = (Win+Alt held AND `settings.hide_hotkey`) OR (`g_hide_override` AND NOT settings open) (tray "Show/Hide"). Window slides to `y = g_base_y - phys_h*g_hide`, opacity via raw vtable slot 25.
-- **Opacity** comes from `settings.json`: `g_window_alpha = opacity_hover/255` when hovered+Ctrl, else `opacity_normal/255` (defaults 180/240).
+- **Opacity** comes from `settings.json`: `g_window_alpha = opacity_normal/255` (default 240).
 - **Positioning**: `window_apply_position()` reads `settings.monitor_index` (-1=primary, else EnumDisplayMonitors index) + `settings.x_offset` and centers the window; re-called whenever settings change. `monitor_work_area()` callback walks monitors.
 - Fonts loaded in `run()` at `11/14/32/14 × g_ui_scale` px; `io.FontGlobalScale = 1/scale` keeps logical sizes.
 - `g_swap_chain` is declared `IDXGISwapChain*`; `CreateSwapChainForComposition` returns `IDXGISwapChain1*` — assign through a local variable, not `&g_swap_chain`.
@@ -181,7 +182,7 @@ The whole UI is laid out in **logical px** (600×150) and scaled up by `g_ui_sca
 
 ## Settings (src/settings/) — `%APPDATA%\OptiNotch\settings.json`
 
-`AppSettings` holds: `monitor_index` (-1=primary), `x_offset`, `hide_hotkey`, `start_with_windows`, `accent_r/g/b`, `opacity_normal/hover` (0..255), `media_enabled`, `calendar_enabled`. Access via `settings_get()`/`settings_set()` (mutex-guarded); `settings_save()` writes JSON; `settings_apply_autostart()` syncs the `HKCU\...\Run` "OptiNotch" value (points to the exe, or to `python runner.py` when running under python). UI reads the accent/opacity every frame via `accent_u32()` in `main_ui.cpp`.
+`AppSettings` holds: `monitor_index` (-1=primary), `x_offset`, `hide_hotkey`, `start_with_windows`, `accent_r/g/b`, `opacity_normal` (0..255), `media_enabled`, `calendar_enabled`. Access via `settings_get()`/`settings_set()` (mutex-guarded); `settings_save()` writes JSON; `settings_apply_autostart()` syncs the `HKCU\...\Run` "OptiNotch" value (points to the exe, or to `python runner.py` when running under python). UI reads the accent/opacity every frame via `accent_u32()` in `main_ui.cpp`.
 
 ## Tray (src/tray/)
 
