@@ -51,7 +51,7 @@ The DLL target defines `OPTINOTCH_BUILD_AS_DLL` to export symbols via `__declspe
 # Release package (separate build-release/ dir): python tools/make_release.py
 ```
 
-The release zip lands in `dist/OptiNotch-<ver>.zip` containing `OptiNotch.exe` (statically linked, no runtime DLLs), `assets/`, `README.txt`, `gcal_credentials.example.json`, and — when found — the real **`gcal_credentials.json`** bundled from the owner's repo-root copy (or `%APPDATA%\OptiNotch\`), so end users sign in with their own Google account and never touch the Cloud console. The exe must run with CWD = its own folder so `assets/fonts/` resolves; the tray "Start with Windows" handles that by pointing straight at the exe.
+The release zip lands in `dist/OptiNotch-<ver>.zip` containing `OptiNotch.exe` (statically linked, no runtime DLLs, fonts embedded via `#embed` — fully self-contained, no `assets/` folder at runtime), `README.txt`, `gcal_credentials.example.json`, and — when found — the real **`gcal_credentials.json`** bundled from the owner's repo-root copy (or `%APPDATA%\OptiNotch\`), so end users sign in with their own Google account and never touch the Cloud console. Because fonts are embedded, the exe runs regardless of CWD — the tray "Start with Windows" just points straight at the exe.
 
 ## Project structure (current)
 
@@ -144,12 +144,13 @@ Gotchas in this ImGui build:
 
 ## Window behavior (src/window/window.cpp)
 
-- Constants: `NOTCH_WIDTH=120`, `NOTCH_HEIGHT=20`, `EXPANDED_WIDTH=600`, `EXPANDED_HEIGHT=190`. These are **logical px**; the physical window/swapchain are scaled by `g_ui_scale` (DPI of the chosen monitor, fixed at startup, ≥1).
+- Constants: `NOTCH_WIDTH=120`, `NOTCH_HEIGHT=20`, `EXPANDED_WIDTH=600`, `EXPANDED_HEIGHT=190`. These are **logical px**; the physical window/swapchain are scaled by `g_ui_scale` (resolution-derived, fixed at startup; see "Sizing / scaling" below).
 - Window is **fixed** at `EXPANDED_WIDTH x EXPANDED_HEIGHT` (scaled), top-center of the configured monitor's **work area**, flush with its top. Created and swapped at the expanded size; **no per-frame `SetWindowPos`/`ResizeBuffers`** — the swapchain/RTV are created once in `create_d3d11()`.
 - The island grows/shrinks symmetrically inside the fixed window: `render_ui()` computes `iw`/`ih` from `g_progress` (`120→600` x `20→190`) and offsets `ix = (width-iw)/2`, so both edges expand from center. `update_window_animation()` only updates `g_progress` and `g_window_alpha`.
 - **Expanded layout = header bar + content section.** `render_ui()` reserves a 24px header (`HEADER_H`) at the top of the expanded island: the clock (left, `ix+18`) and the settings gear (right, `ix+iw-22`, own `##gear_hit` child so it stays top-most) vertically centered. The `island_content` child starts at `iy + HEADER_H` with height `ih - HEADER_H`, so the calendar/media/settings halves keep their exact internal layout at the same ~166px content height — they are just shifted down. The calendar/media vertical divider spans `iy + HEADER_H + 12` → `iy + ih - 12`. The calendar half's own top-row clock was removed when the header clock arrived; the media half's vertical stack is biased ~8px upward (`cy0 = o.y + (H-102)*0.5 - 8`).
 - Hover expands: `g_progress += 0.12f` per frame when hovered, `-= 0.12f` otherwise (clamped 0..1). `point_over_island()`/`update_window_region()` use `island_window_rect()` in **physical** px (logical constants × `g_ui_scale`). While the settings panel is open (`ui_settings_open()`), the notch is treated as hovered AND hide-override is cancelled, so opening Settings from the tray always reveals the expanded notch.
 - **Hide**: animated via `g_hide` 0→1. Want-hidden = (Win+Alt held AND `settings.hide_hotkey`) OR (`g_hide_override` AND NOT settings open) (tray "Show/Hide"). Window slides to `y = g_base_y - phys_h*g_hide`, opacity via raw vtable slot 25.
+- **Quit**: tray menu "Quit" or the global hotkey **Ctrl+Alt+Q** (`RegisterHotKey` → `WM_HOTKEY` → `WM_DESTROY`, registered in `create_window()`). Works while hidden/unfocused; auto-released on process exit.
 - **Opacity** comes from `settings.json`: `g_window_alpha = opacity_normal/255` (default 240).
 - **Positioning**: `window_apply_position()` reads `settings.monitor_index` (-1=primary, else EnumDisplayMonitors index) + `settings.x_offset` and centers the window; re-called whenever settings change. `monitor_work_area()` callback walks monitors.
 - Fonts loaded in `run()` at `11/14/32/14 × g_ui_scale` px; `io.FontGlobalScale = 1/scale` keeps logical sizes.
@@ -158,21 +159,20 @@ Gotchas in this ImGui build:
 
 ## ImGui integration
 
-- Vendored at `imgui/` (repo root). Backends: `imgui_impl_win32` + `imgui_impl_dx11`.
-- Linked against `d3d11`, `dxgi`, `dwmapi`, `d3dcompiler`, `dcomp`.
-- `runner.py` `os.chdir()`s to repo root before loading, so relative paths like `assets/fonts/` resolve from the project root.
+- Vendored at `imgui/` (repo root). Backends: `imgui_impl_win32` + `imgui_impl_dx11`. `imgui_impl_win32` carries a small OptiNotch patch (`ImGui_ImplWin32_SetMouseScale`) so the mouse is reported in logical px; keep it if the backend is ever updated.
+- UI fonts (Inter Regular/SemiBold) are embedded in `src/main.cpp` via `#embed` (clang extension/C23) and loaded with `AddFontFromMemoryTTF` + `FontDataOwnedByAtlas=false`, so the app is self-contained. The system icon font still loads from `C:/Windows/Fonts/SegMDL2.ttf`. This replaced an earlier RCDATA-resource approach that failed at runtime (lld resource-data bug, GetLastError 1812).
 
-## DPI scaling (framebuffer-scale trick)
+## Sizing / scaling (framebuffer-scale trick)
 
-The whole UI is laid out in **logical px** (600×150) and scaled up by `g_ui_scale`:
+The whole UI is laid out in **logical px** (600×190) and scaled up by `g_ui_scale`:
 
-- `ImGui_ImplWin32_EnableDpiAwareness()` at the top of `run()`, before any window.
-- `g_ui_scale` = chosen monitor's DPI/96 (via `ImGui_ImplWin32_GetDpiScaleForMonitor`), computed in `create_window()`, clamped ≥1, **fixed at startup**.
-- Window + swapchain are created at physical size (`600×scale × 150×scale`).
-- Each frame after `ImGui_ImplWin32_NewFrame()`, `main.cpp` overrides `io.DisplaySize = (600,150)` (logical) and `io.DisplayFramebufferScale = (scale,scale)`. The vendored DX11 backend honors `draw_data->FramebufferScale`, so all geometry scales automatically.
+- `ImGui_ImplWin32_EnableDpiAwareness()` at the top of `run()`, before any window (keeps monitor geometry in physical px).
+- `g_ui_scale` = `NOTCH_WIDTH_FRACTION * screen_width / NOTCH_WIDTH`, where `screen_width` is the chosen monitor's **physical width** — so the collapsed island is a fixed 8% of the screen width and everything scales with the **resolution**, not the DPI. Clamped ≥ `MIN_UI_SCALE` (0.7), computed in `create_window()`, **fixed at startup**. Tune the size with `NOTCH_WIDTH_FRACTION` in `window.h`.
+- Window + swapchain are created at physical size (`600×scale × 190×scale`).
+- Each frame after `ImGui_ImplWin32_NewFrame()`, `main.cpp` overrides `io.DisplaySize = (600,190)` (logical) and `io.DisplayFramebufferScale = (scale,scale)`. The vendored DX11 backend honors `draw_data->FramebufferScale`, so all geometry scales automatically.
 - Fonts loaded at `size × scale` so glyphs rasterize crisp; `io.FontGlobalScale = 1/scale` keeps `ImGui::GetFontSize()` in logical px for layout.
-- The Win32 backend reports the mouse in **physical** client px — `main.cpp` divides `io.MousePos`/`io.MousePosPrev` by scale after `ImGui::NewFrame()`.
-- At 96 DPI everything is identity; behavior is unchanged.
+- The Win32 backend reports the mouse in **physical** client px; `ImGui_ImplWin32_SetMouseScale(g_ui_scale)` (called in `run()` after `create_window`) makes it report **logical** px instead, matching `io.DisplaySize`. This must happen in the backend (not by dividing `io.MousePos` after `NewFrame()`), because ImGui's `UpdateHoveredWindowAndCaptureFlags()` runs inside `NewFrame()` with the reported position — dividing late left it physical against logical window rects and broke all hover/click at scale ≠ 1.
+- On a 1366×768 screen at 100% DPI the scale is ≈0.91; DPI scaling itself is otherwise ignored for sizing.
 
 ## DLL gotchas
 

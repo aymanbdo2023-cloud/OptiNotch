@@ -16,8 +16,8 @@ static bool g_hide_override = false;
 float g_progress = 0.0f;
 float g_window_alpha = 240.0f / 255.0f;
 
-// Physical px per logical px. Fixed at startup from the chosen monitor's DPI;
-// the whole UI (fonts, swapchain, hit-testing) is scaled by this factor.
+// Physical px per logical px. Fixed at startup from the chosen monitor's
+// resolution; the whole UI (fonts, swapchain, hit-testing) is scaled by it.
 static float g_ui_scale = 1.0f;
 
 // MinGW's dcomp.h has no IDCompositionVisual3, the interface that carries
@@ -171,6 +171,10 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
+    case WM_HOTKEY:
+        if (wparam == QUIT_HOTKEY_ID)
+            PostMessageW(hwnd, WM_DESTROY, 0, 0);
+        return 0;
     case WM_LBUTTONDOWN:
         SetFocus(hwnd);
         return 0;
@@ -191,15 +195,21 @@ bool create_window(HINSTANCE instance, int width, int height) {
 
     RegisterClassExW(&wc);
 
-    // Scale the fixed logical window by the target monitor's DPI so the notch
-    // is the same physical size on high-DPI displays.
+    // Scale the fixed logical window so the collapsed island is
+    // NOTCH_WIDTH_FRACTION of the target monitor's width. This ties the whole
+    // UI (fonts, icons, widgets, hit-testing) to the screen's resolution
+    // rather than its DPI, so bigger screens get proportionally bigger notches.
     RECT wr;
     if (!monitor_work_area(settings_get().monitor_index, wr))
         GetClientRect(GetDesktopWindow(), &wr);
     HMONITOR hm = MonitorFromRect(&wr, MONITOR_DEFAULTTONEAREST);
-    g_ui_scale = ImGui_ImplWin32_GetDpiScaleForMonitor(hm);
-    if (g_ui_scale < 1.0f)
-        g_ui_scale = 1.0f;
+    MONITORINFO mi = {};
+    mi.cbSize = sizeof(mi);
+    GetMonitorInfoW(hm, &mi);
+    int screen_w = mi.rcMonitor.right - mi.rcMonitor.left;
+    g_ui_scale = (NOTCH_WIDTH_FRACTION * (float)screen_w) / (float)NOTCH_WIDTH;
+    if (g_ui_scale < MIN_UI_SCALE)
+        g_ui_scale = MIN_UI_SCALE;
     int phys_w = (int)(width * g_ui_scale + 0.5f);
     int phys_h = (int)(height * g_ui_scale + 0.5f);
 
@@ -219,6 +229,10 @@ bool create_window(HINSTANCE instance, int width, int height) {
     MARGINS margins = { -1, -1, -1, -1 };
     DwmExtendFrameIntoClientArea(g_hwnd, &margins);
 
+    // Global quit hotkey: Ctrl+Alt+Q. Works without focus, even while the
+    // notch is hidden. Failure is non-fatal (tray Quit remains a fallback).
+    RegisterHotKey(g_hwnd, QUIT_HOTKEY_ID, MOD_CONTROL | MOD_ALT, 'Q');
+
     window_apply_position();
     return true;
 }
@@ -229,6 +243,7 @@ HWND get_window_handle() {
 
 void destroy_window() {
     if (g_hwnd) {
+        UnregisterHotKey(g_hwnd, QUIT_HOTKEY_ID);
         DestroyWindow(g_hwnd);
         g_hwnd = nullptr;
     }

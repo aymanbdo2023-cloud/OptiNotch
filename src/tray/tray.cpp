@@ -69,6 +69,7 @@ void show_menu() {
     AppendMenuW(m, (s.hide_hotkey ? MF_STRING | MF_CHECKED : MF_STRING),
         M_HOTKEY, L"Win+Alt hides the notch");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m, MF_STRING | MF_DISABLED | MF_GRAYED, 0, L"Ctrl+Alt+Q quits");
     AppendMenuW(m, MF_STRING, M_QUIT, L"Quit");
 
     POINT pt;

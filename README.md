@@ -31,13 +31,15 @@ idle, informative when you need it, and gone when you don't.
 - **System tray** — icon + menu: show/hide the notch, open Settings, toggle
   **Start with Windows** and the **Win+Alt** hide hotkey, or Quit.
 - **Win+Alt hotkey** — hold to slide the notch off the top of the screen.
+- **Ctrl+Alt+Q** — global quit hotkey, closes the notch from anywhere (even when hidden).
 - **Settings panel** (in-notch, gear icon or tray) — monitor selection,
   horizontal position offset, hide hotkey, start-with-Windows, accent color,
   opacity, and Google account management.
-- **Multi-monitor & DPI aware** — the notch tracks the work area of your chosen
-  monitor and scales for high-DPI displays so it looks consistent everywhere.
-- **Start with Windows** — registers a `HKCU\...\Run` entry (the exe points at
-  itself and chdirs to its own folder so `assets/` resolves).
+- **Multi-monitor & resolution-sized** — the notch tracks the work area of your
+  chosen monitor and scales with the screen's resolution (a fixed % of the
+  screen width), so it looks proportional on any display regardless of DPI.
+- **Start with Windows** — registers a `HKCU\...\Run` entry pointing at the exe
+  (fonts are embedded, so it runs fine regardless of the working directory).
 
 ---
 
@@ -67,8 +69,8 @@ big always-open widget, panel, or taskbar clutter:
 ## Installation (end users)
 
 1. Download `OptiNotch-<ver>.zip` from `dist/` (or a release).
-2. Unzip anywhere; keep `OptiNotch.exe` and the `assets/` folder together —
-   the exe loads its fonts from `assets/fonts/` relative to its own location.
+2. Unzip anywhere; the exe is fully self-contained (fonts are embedded), so
+   there is no separate assets/ folder to keep together.
 3. Double-click `OptiNotch.exe`. It runs from the tray.
 4. Optional: tray menu → **Start with Windows** to launch at login.
 5. Optional: hover the expanded notch → gear → **Settings** to pick your
@@ -167,9 +169,10 @@ Get-Process | Where-Object { $_.Name -match 'python|OptiNotch' } | Stop-Process 
 python tools/make_release.py
 ```
 
-Builds a Release `OptiNotch.exe` (statically linked, no runtime DLLs) and packs
-`dist/OptiNotch-<ver>.zip` with `assets/`, `README.txt`, and — when found — the
-real `gcal_credentials.json` (so end users sign in with their own account).
+Builds a Release `OptiNotch.exe` (statically linked, no runtime DLLs, fonts
+embedded) and packs `dist/OptiNotch-<ver>.zip` with just the exe, `README.txt`,
+and — when found — the real `gcal_credentials.json` (so end users sign in with
+their own account).
 
 ---
 
@@ -221,7 +224,7 @@ src/
 ├── calendar/          # Google Calendar OAuth2 + events, HTTP, JSON
 ├── media/             # Windows.Media.Control (SMTC) session manager, album art
 imgui/                 # vendored Dear ImGui (repo root)
-assets/fonts/          # Inter-Regular.ttf, Inter-SemiBold.ttf
+assets/fonts/          # Inter fonts (embedded into the exe via #embed at build)
 runner.py              # dev build + run via Python ctypes
 tools/                 # make_release.py, README.txt (shipped), gcal_credentials.example.json
 CMakeLists.txt         # C++17

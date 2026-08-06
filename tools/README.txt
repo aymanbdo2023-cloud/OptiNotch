@@ -36,4 +36,4 @@ Troubleshooting
 ---------------
 - If the clock bar never shows, an antivirus may be blocking the exe; add an
   exception.
-- Fonts ship in the assets/ folder next to the exe - keep them together.
+- Fonts are embedded in the exe - it is fully self-contained, just one file.

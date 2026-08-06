@@ -5,6 +5,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Fonts are embedded directly in src/main.cpp via #embed, so the app is a
+# single self-contained file (no assets/ folder needed at runtime).
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui)

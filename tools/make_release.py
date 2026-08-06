@@ -1,4 +1,7 @@
-"""Build a Release OptiNotch.exe and zip it with its assets into dist/.
+"""Build a Release OptiNotch.exe and zip it into dist/.
+
+Fonts are embedded in the exe (#embed), so the release is a single
+self-contained file that needs no assets/ folder at runtime.
 
 Run from the repo root:
     python tools/make_release.py
@@ -64,7 +67,6 @@ def package():
     out_dir.mkdir(parents=True)
 
     shutil.copy2(exe, out_dir / "OptiNotch.exe")
-    shutil.copytree(ROOT / "assets", out_dir / "assets")
     shutil.copy2(ROOT / "tools" / "gcal_credentials.example.json",
                  out_dir / "gcal_credentials.example.json")
     shutil.copy2(ROOT / "tools" / "README.txt", out_dir / "README.txt")

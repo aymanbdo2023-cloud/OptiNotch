@@ -37,6 +37,16 @@ ImFont* g_font_icons = nullptr;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
+// Fonts are embedded with #embed (C23 / clang extension) so the app is a
+// single self-contained file (no assets/ folder, no dependence on the working
+// directory). The static arrays keep the bytes alive for ImGui's lifetime.
+static const unsigned char FONT_REGULAR[] = {
+#embed "../assets/fonts/Inter-Regular.ttf"
+};
+static const unsigned char FONT_SEMI[] = {
+#embed "../assets/fonts/Inter-SemiBold.ttf"
+};
+
 static bool create_d3d11(HWND hwnd) {
     UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
     D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_0 };
@@ -160,7 +170,8 @@ static void cleanup_d3d11() {
 }
 
 extern "C" OPTINOTCH_API int run() {
-    // Per-monitor DPI so the notch stays crisp and consistently sized; must be
+    // Per-monitor DPI awareness so monitor geometry is reported in physical
+    // pixels (used to size the notch from the screen's resolution); must be
     // called before any window is created.
     ImGui_ImplWin32_EnableDpiAwareness();
 
@@ -169,6 +180,11 @@ extern "C" OPTINOTCH_API int run() {
 
     if (!create_window(GetModuleHandleW(nullptr), EXPANDED_WIDTH, EXPANDED_HEIGHT))
         return 1;
+
+    // The Win32 backend must report the mouse in logical px (same space as
+    // io.DisplaySize), so ImGui's hovered-window pass in NewFrame() matches the
+    // layout. Must be set after create_window() fixes g_ui_scale.
+    ImGui_ImplWin32_SetMouseScale(get_ui_scale());
 
     if (!create_d3d11(get_window_handle()))
         return 2;
@@ -186,10 +202,21 @@ extern "C" OPTINOTCH_API int run() {
     // logical px for layout math.
     const float scale = get_ui_scale();
     ImGuiIO& io = ImGui::GetIO();
-    g_font_small     = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-Regular.ttf", 11.0f * scale);
-    g_font_normal    = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-Regular.ttf", 14.0f * scale);
-    g_font_clock     = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-SemiBold.ttf", 32.0f * scale);
-    g_font_collapsed = io.Fonts->AddFontFromFileTTF("assets/fonts/Inter-SemiBold.ttf", 14.0f * scale);
+    int sz_reg = (int)sizeof(FONT_REGULAR);
+    int sz_semi = (int)sizeof(FONT_SEMI);
+    const unsigned char* f_reg = FONT_REGULAR;
+    const unsigned char* f_semi = FONT_SEMI;
+    if (!f_reg || !f_semi || sz_reg <= 0 || sz_semi <= 0) {
+        fprintf(stderr, "error: embedded fonts missing\n");
+        return 4;
+    }
+    // The embedded data must NOT be freed by the atlas.
+    ImFontConfig font_cfg;
+    font_cfg.FontDataOwnedByAtlas = false;
+    g_font_small     = io.Fonts->AddFontFromMemoryTTF((void*)f_reg, sz_reg, 11.0f * scale, &font_cfg);
+    g_font_normal    = io.Fonts->AddFontFromMemoryTTF((void*)f_reg, sz_reg, 14.0f * scale, &font_cfg);
+    g_font_clock     = io.Fonts->AddFontFromMemoryTTF((void*)f_semi, sz_semi, 32.0f * scale, &font_cfg);
+    g_font_collapsed = io.Fonts->AddFontFromMemoryTTF((void*)f_semi, sz_semi, 14.0f * scale, &font_cfg);
     {
         static const ImWchar icon_ranges[] = { 0xE000, 0xF8FF, 0, 0 };
         g_font_icons = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/SegMDL2.ttf", 16.0f * scale, nullptr, icon_ranges);
@@ -227,11 +254,8 @@ extern "C" OPTINOTCH_API int run() {
 
         ImGui::NewFrame();
 
-        // The Win32 backend reports the mouse in physical px; map to logical.
-        io.MousePos.x /= scale;
-        io.MousePos.y /= scale;
-        io.MousePosPrev.x /= scale;
-        io.MousePosPrev.y /= scale;
+        // Mouse coordinates arrive in logical px from the Win32 backend
+        // (ImGui_ImplWin32_SetMouseScale), matching io.DisplaySize above.
 
         render_ui(g_progress > 0.5f, EXPANDED_WIDTH, EXPANDED_HEIGHT);
         ImGui::Render();

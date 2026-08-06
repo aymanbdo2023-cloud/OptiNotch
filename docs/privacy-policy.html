@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — OptiNotch</title>
+  <meta name="description" content="OptiNotch privacy policy: how the app handles Google Calendar data, media info, settings, and OAuth tokens.">
+  <link rel="icon" type="image/svg+xml" href="img/notch.svg">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href="index.html">
+        <svg class="brand-mark" viewBox="0 0 34 10" aria-hidden="true">
+          <rect x="0" y="0" width="34" height="10" rx="4" fill="#17171f" stroke="rgba(255,255,255,0.25)"/>
+          <rect x="9" y="1" width="6" height="3" rx="1" fill="#5C93FF"/>
+          <rect x="19" y="2" width="8" height="1.4" rx="0.7" fill="rgba(255,255,255,0.7)"/>
+        </svg>
+        OptiNotch
+      </a>
+      <nav class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="privacy-policy.html">Privacy</a>
+        <a href="https://github.com/aymanbdo2023-cloud/OptiNotch" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="prose container">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: August 6, 2026</p>
+
+    <p>
+      OptiNotch is a Windows desktop application that displays a small overlay bar at
+      the top of your screen. This policy explains what information the app accesses,
+      how it is used, and what we never do with it.
+    </p>
+
+    <div class="callout">
+      <strong>In short:</strong> OptiNotch stores everything locally on your own
+      computer. It does not use analytics, does not show ads, and does not send your
+      data to any server we operate.
+    </div>
+
+    <h2>Google Calendar data</h2>
+    <p>
+      Calendar features are optional and require you to sign in with your own Google
+      account. OptiNotch uses Google's official OAuth 2.0 flow and requests
+      <strong>read-only</strong> access to your Google Calendar events
+      (<code>calendar.readonly</code>). It can view but cannot create, modify, or
+      delete events.
+    </p>
+    <p>Calendar data is used solely to display your events inside the app. It is:</p>
+    <ul>
+      <li>Fetched directly from Google only after you sign in.</li>
+      <li>Kept only in the app's memory while running.</li>
+      <li>Never uploaded to our servers, never sold, and never shared with anyone.</li>
+    </ul>
+
+    <h2>Now-playing media information</h2>
+    <p>
+      When enabled, OptiNotch uses the Windows Media (SMTC) service to show the title,
+      artist, and album art of whatever is currently playing on your system. This
+      information stays on your computer and is only used to render the media display.
+    </p>
+
+    <h2>Settings</h2>
+    <p>
+      Your preferences — monitor selection, position, accent color, opacity, and
+      whether features are enabled — are stored in a local configuration file in
+      <code>%APPDATA%\OptiNotch\settings.json</code>. Nothing leaves your machine.
+    </p>
+
+    <h2>Sign-in credentials and tokens</h2>
+    <p>
+      When you connect your Google account, an access token and refresh token are
+      stored locally in <code>%APPDATA%\OptiNotch\gcal_token.json</code>. These tokens
+      are used only to request your calendar from Google and are transmitted only to
+      Google as part of the standard OAuth flow. Signing out of the app deletes this
+      token file. You can also revoke access at any time from your
+      <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google account permissions page</a>.
+    </p>
+
+    <h2>What we do not do</h2>
+    <ul>
+      <li>We do not collect, store, or transmit any personal information on our servers.</li>
+      <li>We do not use analytics, crash reporting, or tracking of any kind.</li>
+      <li>We do not display advertisements.</li>
+      <li>We do not sell or share your data with third parties.</li>
+    </ul>
+
+    <h2>Third-party services</h2>
+    <p>
+      The only third-party service the app communicates with is Google, and only when
+      you choose to connect your Google Calendar. Google's handling of your data is
+      governed by
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
+    </p>
+
+    <h2>Data retention and deletion</h2>
+    <p>
+      Because the app does not store your data on any server, there is nothing for us
+      to delete on request. To remove locally stored data, uninstall the app and
+      delete the <code>%APPDATA%\OptiNotch</code> folder. To revoke Google access,
+      use the Sign out option in the app or your Google account settings.
+    </p>
+
+    <h2>Changes to this policy</h2>
+    <p>
+      We may update this policy from time to time. Changes take effect when the
+      "Last updated" date at the top of this page changes.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      If you have any questions about this policy or the app, contact us at
+      <a href="mailto:aycas2004@gmail.com">aycas2004@gmail.com</a>.
+    </p>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>© 2026 OptiNotch</div>
+      <nav class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="mailto:aycas2004@gmail.com">Contact</a>
+        <a href="https://github.com/aymanbdo2023-cloud/OptiNotch" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+
+</body>
+</html>
